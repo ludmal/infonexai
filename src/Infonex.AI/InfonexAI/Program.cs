@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.RateLimiting;
 using NodaTime;
 using WebApplication2;
 using WebApplication2.Endpoints.v1;
@@ -20,6 +21,18 @@ builder.Services.AddSingleton<IClock>(SystemClock.Instance);
 var app = builder.Build();
 
 app.MapGet("/", () => "Hello World!");
+app.MapGet("/ping", (IClock clock) => new
+{
+    Version = "0.1v",
+    DateTime = clock.GetCurrentInstant().ToDateTimeOffset(),
+    Health = "Running"
+});
+
+app.MapGet("/crazy", () => "Some crazy stuff");
+var workspace = app.MapGroup("workspace");
+workspace.MapGet("/", Workspace.Create);
+
+
 
 // app.MapPost("/products", ProductsEndpoints.GetData);
 // app.MapPost("/html", ProductsEndpoints.GetUrlData);

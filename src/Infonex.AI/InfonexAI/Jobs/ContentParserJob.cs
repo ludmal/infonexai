@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Globalization;
+using Cronos;
 using NCrontab;
 using NodaTime;
 
@@ -7,27 +8,32 @@ namespace WebApplication2.Jobs;
 
 public class ContentParserJob : BackgroundService
 {
+    private readonly IConfiguration _configuration;
     private readonly IClock _clock;
-    private CrontabSchedule _schedule;
-    private DateTime _nextRun;
 
     public ContentParserJob(IConfiguration configuration, IClock clock)
     {
+        _configuration = configuration;
         _clock = clock;
-        _schedule = CrontabSchedule.Parse(configuration["Jobs:ContentParserJob:Cron"],new CrontabSchedule.ParseOptions { IncludingSeconds = true });
-        _nextRun = _schedule.GetNextOccurrence(DateTime.Now);
     }
     
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // do
-        // {
-        //     var now = DateTime.Now;
-        //     if (now <= _nextRun) continue;
-        //     await Process();
-        //     _nextRun = _schedule.GetNextOccurrence(DateTime.Now);
-        // }
-        // while (!stoppingToken.IsCancellationRequested);
+        do
+        {
+            var now = _clock.GetCurrentInstant().ToDateTimeUtc();
+            var next = CronExpression.Parse(_configuration["Jobs:ContentParserJob:Cron"]).GetNextOccurrence(now);
+            if (next is null)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                continue;
+            }
+
+            var delay = next.Value - now;
+            await Task.Delay(delay.Add(TimeSpan.FromSeconds(1)), stoppingToken);
+            await Process();
+        }
+        while (!stoppingToken.IsCancellationRequested);
 
         await Task.CompletedTask;
     }
